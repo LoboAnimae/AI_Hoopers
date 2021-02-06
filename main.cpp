@@ -2,11 +2,15 @@
 #include <array>
 #include <string>
 
+using std::cout, std::cin, std::endl;
+
 class Piece;
 
 class Table;
 
 class Game;
+
+int Game(Table table);
 
 
 void fillRows(Table table, int rows, int displacement);
@@ -59,23 +63,47 @@ void printTable(Table table) {
     std::cout << "     ====================";
 
     for (int i = 0; i < 10; i++) {
-        std::cout << std::endl << i << "||  ";
+        std::cout << std::endl << 9 - i << " || ";
         for (int j = 9; j >= 0; j--) {
             int color = 2;
             if (table.table[j][i] == 1) color = 0;
             if (table.table[j][i] == 2) color = 1;
-            std::cout << colors[color] << table.table[j][i] << colors[2] <<  " ";
+            std::cout << colors[color] << table.table[j][i] << colors[2] << " ";
         }
     }
 }
 
-Table createGame(Table table) {
+Table createBoard() {
     Table top;
     for (int i = 5; i >= 1; i--) {
         top = fillRows(top, 1, i, i + 5, 1);
         top = fillRows(top, i + 5, 10, i, 2);
     }
     return top;
+}
+
+int Game(Table table) {
+    bool running = true;
+    int x = -1, y = -1;
+    char changeTurn = 'N';
+    while (running) {
+        try {
+            std::cout << "\nX coordinate: ";
+            std::cin >> x;
+            std::cout << "\nY coordinate: ";
+            std::cin >> y;
+            std::cout << "\nChange coords? (Y/N)";
+            std::cin >> changeTurn;
+            changeTurn = putchar(toupper(changeTurn));
+
+            if (changeTurn == 'Y') throw 'Change turn';
+
+
+        } catch (std::string myError) {
+            // Do nothing
+        }
+        running = !running;
+    }
 }
 
 int main() {
@@ -100,9 +128,9 @@ int main() {
 
     // Create the game
 
-    top = createGame(top);
+    top = createBoard();
     printTable(top);
-
+    Game(top);
     return 0;
 
 }
