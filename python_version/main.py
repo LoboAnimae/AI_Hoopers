@@ -1,9 +1,39 @@
-import numpy as np
+from math import pow, sqrt
+
+MAX_DEPTH = 12
+LAST_VISITED = [ -1, -1 ]
+OPTIMAL_PLAY = None
+OPTIMAL_MAGNITUDE = None
 
 
+# Classes
 class Piece:
     def __init__( self, color ):
         self.color = color
+
+
+class Node:
+    def __init__( self, x, y, player, parent = None ):
+        self.x = x
+        self.y = y
+        self.objective = [ 0, 9 ] if player == 1 else [ 9, 0 ]
+        self.children = [ ]
+        self.parent = parent
+
+    def add_node( self, node ) -> None:
+        self.children.append( node )
+
+    def __str__( self ):
+        description = 'Node %s ' % str( [ self.y, self.x ] )
+        parent = 'is a root node '
+        if self.parent is not None:
+            parent = ' has parent %s ' % str( [ self.parent[ 1 ], self.parent[ 0 ] ] )
+        children = 'and is parent to nodes'
+        for i in self.children:
+            children += ' %s ' % str( [ i.x, i.y ] )
+        if children == 'and is parent to nodes':
+            return 'and no children'
+        return description + parent + children + '.'
 
 
 class Table:
@@ -28,6 +58,50 @@ class Table:
         return ''
 
 
+# Methods
+def explore_children( root, parent = None, tab_arg = 1, depth = 0, original_cords = None ):
+    console = '(Depth %d) %s' % (depth, [ root.y, root.x ])
+    tab = tab_arg
+    if parent is not None:
+        tabulator = ' ' * tab
+        console = tabulator + console
+        tab = tab + 1
+    if original_cords is None:
+        original_cords = { 'x': root.x, 'y': root.y }
+
+    magnitude_change = calculate_magnitude( original_cords, root, { 'x': 0, 'y': 9 } )
+    print( console + ' ' + str(magnitude_change))
+    node = [ ]
+    if len( root.children ) != 0:
+        for child in root.children:
+            child_magnitude, new_node = explore_children( child, root, tab, depth = depth + 1,
+                                                          original_cords = original_cords )
+            if magnitude_change:
+                if magnitude_change > child_magnitude:
+                    magnitude_change = child_magnitude
+                    node = new_node
+
+    return magnitude_change, node if len(node) != 0 else [root.x, root.y]
+
+
+# The AI has to try to go forward, no matter what
+# If the AI finds itself a large magnitude, it could
+# be going back and forth in a plane, never going towards
+# the objective.
+# To solve this, the magnitude has ALWAYS to be decreasing.
+def calculate_magnitude( original_cords, new_cord, objective ):
+    if [ original_cords[ 'x' ], original_cords[ 'y' ] ] == [ new_cord.x, new_cord.y ]:
+        return 1000000000000
+    # This is a mess of optimization
+    current_magnitude = sqrt(
+            pow( (original_cords[ 'x' ] - objective[ 'x' ]), 2 ) + pow( (original_cords[ 'y' ] - objective[ 'y' ]),
+                                                                        2 ) )
+    viable = sqrt( pow( (new_cord.x - objective[ 'x' ]), 2 ) + pow( (new_cord.y - objective[ 'y' ]), 2 ) )
+    if not (viable < current_magnitude):
+        return 10000000000000
+    return viable
+
+
 # If we think about how a single cell can move, it
 # has the possibility to move around using a transitive property,
 # such as in Discrete mathematics. In such a case, the game could
@@ -47,27 +121,8 @@ def game():
         y = int( input( 'Piece from (Y-Cord): ' ) )
         x, y = y, x
         result = find_possible_moves( board.table, x, y, turn )
+        result = explore_children( result )
         print( result )
-
-
-class Node:
-    def __init__( self, x, y, player ):
-        self.x = x
-        self.y = y
-        self.objective = [ 0, 9 ] if player == 1 else [ 9, 0 ]
-        self.children = [ ]
-
-    def add_node( self, node ) -> None:
-        self.children.append( node )
-
-    def __str__( self ):
-        description = 'Node %s with the following children:\n' % str( [ self.y, self.x ] )
-        children = ''
-        for i in self.children:
-            children += '- %s \n' % str( i ) if i is not None else ''
-        if children == '':
-            return 'Node %s with no children.' % str( [ self.y, self.x ] )
-        return description + children
 
 
 def has_piece( top, x, y ):
@@ -80,14 +135,14 @@ def is_current_player_piece( top, x, y, player ):
     return top[ x ][ y ] == player
 
 
-def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True, depth = 0 ) -> list:
-    if depth == 4:
+def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True, depth = 0, parent = None ) -> list:
+    if depth == MAX_DEPTH:
         return None
-    root = Node( x, y, player = player )
-    objective = [ 9, 0 ] if player == 1 else [ 9, 0 ]
-    goes_to_objective = False
-    if is_current_player_piece( top, x, y, player ):
-        goes_to_objective = True
+    root = Node( x, y, player = player, parent = parent )
+    # objective = [ 9, 0 ] if player == 1 else [ 9, 0 ]
+    # goes_to_objective = False
+    # if is_current_player_piece( top, x, y, player ):
+    #     goes_to_objective = True
 
     around_cords = [
         [ x - 1, y + 1 ], [ x, y + 1 ], [ x + 1, y + 1 ],
@@ -96,6 +151,8 @@ def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True,
     ]
 
     for cord in around_cords:
+        if cord == [ root.x, root.y ]:
+            continue
         try:
             x_cord, y_cord = cord
             exists = has_piece( top, x_cord, y_cord )
@@ -104,49 +161,19 @@ def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True,
             elif exists:
                 new_x = (2 * x_cord) - x
                 new_y = (2 * y_cord) - y
+                if [ new_x, new_y ] == parent:
+                    continue
                 if has_piece( top, new_x, new_y ):
                     continue
-                root.add_node( find_possible_moves( top, new_x, new_y, player, False, depth + 1 ) )
+                root.add_node(
+                        find_possible_moves( top, new_x, new_y, player, False, depth + 1,
+                                             parent = [ root.x, root.y ] ) )
         except:
             pass
     return root
 
-    # original_cords = None
 
-
-# possible_cords = [ ]
-# if parent is None:
-#     original_cords = cords
-# try:
-#     if top.table[ x_cords ][ y_cords ] == 0:
-#         raise Exception( 'No piece' )
-#     if cords == original_cords and parent is not None:
-#         raise Exception( 'Original' )
-#
-#     around_cords = [
-#         [ x_cords - 1, y_cords + 1 ], [ x_cords, y_cords + 1 ], [ x_cords + 1, y_cords + 1 ],
-#         [ x_cords - 1, y_cords ], [ x_cords + 1, y_cords ],
-#         [ x_cords - 1, y_cords - 1 ], [ x_cords, y_cords - 1 ], [ x_cords + 1, y_cords - 1 ]
-#     ]
-#     for i in around_cords:
-#         x, y = i
-#         if x < 0 or x > 9 or y < 0 or y > 9: continue
-#         if top.table[ x ][ y ] == 0:
-#             possible_cords.append( [ x, y ] )
-#
-#     for i in around_cords:
-#         x, y = i
-#         if x < 0 or x > 9 or y < 0 or y > 9: continue
-#         if top.table[ x ][ y ] == 1:
-#             for i in find_possible_moves( top, [ x, y ], original_cords ):
-#                 x, y = i
-#                 possible_cords.append( [ x, i ] )
-#     return possible_cords
-# except Exception as e:
-#     print( e )
-#     return possible_cords
-
-
+# Cords: (y, x)
 def fill_rows():
     top = Table()
     # i = from_column - 1
@@ -159,7 +186,7 @@ def fill_rows():
         [ 1, 0, 0, 1, 0, 0, 0, 0, 0, 0 ],
         [ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
         [ 1, 1, 0, 1, 0, 0, 0, 0, 0, 0 ],
-        [ 1, 1, 1, 0, 0, 0, 0, 0, 0, 0 ],
+        [ 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 ],
         [ 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 ]
     ]
     # while i < to_column:
@@ -168,25 +195,11 @@ def fill_rows():
     return top
 
 
-# def create_board():
-#     top = Table()
-#     # Simulate C for loop
-#     i = 5
-#     while i >= 1:
-#         top = fill_rows( top, 1, i, i + 5, 1 )
-#         top = fill_rows( top, i + 5, 10, i, 2 )
-#         i -= 1
-#     return top
-
-
-# def main():
-#     board = create_board()
-#     print(board)
-
-
-# Cords: (y, x)
 def main():
     game()
 
 
-main()
+if __name__ == '__main__':
+    main()
+else:
+    print( 'Not available as a module.' )
