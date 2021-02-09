@@ -1,9 +1,26 @@
 from math import pow, sqrt
 
 MAX_DEPTH = 12
+CHANGE_PARAMETER = 5
 LAST_VISITED = [ -1, -1 ]
 OPTIMAL_PLAY = None
 OPTIMAL_MAGNITUDE = None
+OBJECTIVE = {
+    1: [ 0, 9 ],
+    2: [ 9, 0 ],
+}
+WIN_CELLS = {
+    1: [
+        [ 5, 0 ], [ 6, 0 ], [ 7, 0 ], [ 8, 0 ], [ 9, 0 ],
+        [ 6, 1 ], [ 7, 1 ], [ 8, 1 ], [ 9, 1 ], [ 7, 2 ],
+        [ 8, 2 ], [ 9, 2 ], [ 8, 3 ], [ 9, 3 ], [ 9, 4 ]
+    ],
+    2: [
+        [ 0, 9 ], [ 0, 8 ], [ 0, 7 ], [ 0, 6 ], [ 0, 5 ],
+        [ 1, 9 ], [ 1, 8 ], [ 1, 7 ], [ 1, 6 ], [ 2, 9 ],
+        [ 2, 8 ], [ 2, 7 ], [ 3, 9 ], [ 3, 8 ], [ 4, 9 ],
+    ]
+}
 
 
 # Classes
@@ -69,19 +86,21 @@ def explore_children( root, parent = None, tab_arg = 1, depth = 0, original_cord
     if original_cords is None:
         original_cords = { 'x': root.x, 'y': root.y }
 
-    magnitude_change = calculate_magnitude( original_cords, root, { 'x': 0, 'y': 9 } )
-    print( console + ' ' + str(magnitude_change))
+    new_magnitude, magnitude_change = calculate_magnitude( original_cords, root, { 'x': 0, 'y': 9 } )
+
+    print( console + ' ' + str( new_magnitude ) + ' (changed ' + str( magnitude_change ) + ')' )
     node = [ ]
     if len( root.children ) != 0:
         for child in root.children:
-            child_magnitude, new_node = explore_children( child, root, tab, depth = depth + 1,
-                                                          original_cords = original_cords )
-            if magnitude_change:
-                if magnitude_change > child_magnitude:
-                    magnitude_change = child_magnitude
+            child_magnitude, magnitude_sub_change, new_node = explore_children( child, root, tab, depth = depth + 1,
+                                                                                original_cords = original_cords )
+            if new_magnitude:
+                if new_magnitude > child_magnitude or magnitude_sub_change > CHANGE_PARAMETER:
+                    new_magnitude = child_magnitude
                     node = new_node
+                    magnitude_change = magnitude_sub_change
 
-    return magnitude_change, node if len(node) != 0 else [root.x, root.y]
+    return new_magnitude, magnitude_change, node if len( node ) != 0 else [ root.y, root.x ]
 
 
 # The AI has to try to go forward, no matter what
@@ -91,15 +110,15 @@ def explore_children( root, parent = None, tab_arg = 1, depth = 0, original_cord
 # To solve this, the magnitude has ALWAYS to be decreasing.
 def calculate_magnitude( original_cords, new_cord, objective ):
     if [ original_cords[ 'x' ], original_cords[ 'y' ] ] == [ new_cord.x, new_cord.y ]:
-        return 1000000000000
+        return 1000000000000, -1
     # This is a mess of optimization
     current_magnitude = sqrt(
             pow( (original_cords[ 'x' ] - objective[ 'x' ]), 2 ) + pow( (original_cords[ 'y' ] - objective[ 'y' ]),
                                                                         2 ) )
     viable = sqrt( pow( (new_cord.x - objective[ 'x' ]), 2 ) + pow( (new_cord.y - objective[ 'y' ]), 2 ) )
     if not (viable < current_magnitude):
-        return 10000000000000
-    return viable
+        return 10000000000000, -1
+    return viable, current_magnitude - viable
 
 
 # If we think about how a single cell can move, it
@@ -109,20 +128,77 @@ def calculate_magnitude( original_cords, new_cord, objective ):
 # position. For this, the starting position cannot be part of the
 # ending positions.
 
+def calculate_move( top, turn = 1 ):
+    search_results = [ ]
+    pieces = [ ]
+
+    for index_y, y in enumerate( top ):
+        for index_x, x in enumerate( y ):
+            if x == turn:
+                pieces.append( [ index_x, index_y ] )
+
+    for piece in pieces:
+        result = find_possible_moves( top, piece[ 1 ], piece[ 0 ], turn )
+        result = explore_children( result )
+        search_results.append( [ piece, result ] )
+    for result in search_results:
+        if result[ 1 ][ 0 ] > 11:
+            search_results.remove( result )
+    from_cord = [ ]
+    to_cord = [ ]
+    best_magnitude = 12
+    for result in search_results:
+        if (len( from_cord ) == 0 or best_magnitude < result[ 1 ][ 1 ]) and best_magnitude:
+            from_cord = result[ 0 ]
+            to_cord = result[ 1 ][ 2 ]
+            best_magnitude = result[ 1 ][ 1 ]
+
+    from_cord.reverse()
+    to_cord.reverse()
+    top = make_move( top, from_cord, to_cord, turn )
+    return top
+
+
 def game():
     board = fill_rows()
     print( 'Current board status: ' )
     print( board )
 
-    turn = 1
+    turn = 2
     running = True
     while running:
-        x = int( input( 'Piece from (X-Cord): ' ) )
-        y = int( input( 'Piece from (Y-Cord): ' ) )
-        x, y = y, x
-        result = find_possible_moves( board.table, x, y, turn )
-        result = explore_children( result )
-        print( result )
+        if turn == 1:
+            board.table = calculate_move( board.table, 1 )
+            turn = 2
+        else:
+            x = int( input( 'Piece from (X-Cord): ' ) )
+            y = int( input( 'Piece from (Y-Cord): ' ) )
+            new_x = int( input( 'Piece to (X-Cord): ' ) )
+            new_y = int( input( 'Piece to (Y-Cord): ' ) )
+            x, y = y, x
+            new_x, new_y = new_y, new_x
+            board.table = make_move( board.table, [ x, y ], [ new_x, new_y ], 2 )
+            turn = 1
+
+        print( board )
+
+
+def make_move( top, old_cord, new_cord, player ):
+    old_x, old_y = old_cord
+    new_x, new_y = new_cord
+
+    top[ old_x ][ old_y ] = 0
+    top[ new_x ][ new_y ] = player
+    return top
+
+
+def return_possible_moves_array( node ):
+    if len( node.children ) != 0:
+        result = [ ]
+        for sub_node in node.children:
+            if len( sub_node.children ) != 0:
+                children = return_possible_moves_array( sub_node )
+                result.append( children )
 
 
 def has_piece( top, x, y ):
@@ -139,17 +215,11 @@ def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True,
     if depth == MAX_DEPTH:
         return None
     root = Node( x, y, player = player, parent = parent )
-    # objective = [ 9, 0 ] if player == 1 else [ 9, 0 ]
-    # goes_to_objective = False
-    # if is_current_player_piece( top, x, y, player ):
-    #     goes_to_objective = True
-
     around_cords = [
         [ x - 1, y + 1 ], [ x, y + 1 ], [ x + 1, y + 1 ],
         [ x - 1, y ], [ x + 1, y ],
         [ x - 1, y - 1 ], [ x, y - 1 ], [ x + 1, y - 1 ]
     ]
-
     for cord in around_cords:
         if cord == [ root.x, root.y ]:
             continue
@@ -179,13 +249,13 @@ def fill_rows():
     # i = from_column - 1
     top.table = [
         [ 0, 0, 0, 0, 0, 2, 2, 2, 2, 2 ],
+        [ 0, 0, 0, 0, 0, 0, 2, 2, 2, 2 ],
         [ 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 ],
-        [ 0, 0, 0, 0, 0, 2, 0, 2, 2, 2 ],
-        [ 0, 0, 0, 1, 0, 0, 0, 0, 2, 2 ],
+        [ 0, 0, 0, 0, 0, 0, 0, 0, 2, 2 ],
         [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 ],
-        [ 1, 0, 0, 1, 0, 0, 0, 0, 0, 0 ],
         [ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-        [ 1, 1, 0, 1, 0, 0, 0, 0, 0, 0 ],
+        [ 1, 1, 0, 0, 0, 0, 0, 0, 0, 0 ],
+        [ 1, 1, 1, 0, 0, 0, 0, 0, 0, 0 ],
         [ 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 ],
         [ 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 ]
     ]
