@@ -24,16 +24,15 @@ WIN_CELLS = {
 
 
 # Classes
-class Piece:
-    def __init__( self, color ):
-        self.color = color
+# class Piece:
+#     def __init__( self, color ):
+#         self.color = color
 
 
-class Node:
+class NodeClass:
     def __init__( self, x, y, player, parent = None ):
         self.x = x
         self.y = y
-        self.objective = [ 0, 9 ] if player == 1 else [ 9, 0 ]
         self.children = [ ]
         self.parent = parent
 
@@ -52,6 +51,8 @@ class Node:
             return 'and no children'
         return description + parent + children + '.'
 
+
+#
 
 class Table:
     def __init__( self ):
@@ -77,6 +78,11 @@ class Table:
 
 # Methods
 def explore_children( root, parent = None, tab_arg = 1, depth = 0, original_cords = None ):
+    if root is None:
+        return 10000000, -1, [ 0, 0 ]
+    for cord in WIN_CELLS:
+        if cord == [ root.y, root.x ]:
+            return 0.01, 12, [ root.y, root.x ]
     console = '(Depth %d) %s' % (depth, [ root.y, root.x ])
     tab = tab_arg
     if parent is not None:
@@ -88,7 +94,7 @@ def explore_children( root, parent = None, tab_arg = 1, depth = 0, original_cord
 
     new_magnitude, magnitude_change = calculate_magnitude( original_cords, root, { 'x': 0, 'y': 9 } )
 
-    print( console + ' ' + str( new_magnitude ) + ' (changed ' + str( magnitude_change ) + ')' )
+    # print( console + ' ' + str( new_magnitude ) + ' (changed ' + str( magnitude_change ) + ')' )
     node = [ ]
     if len( root.children ) != 0:
         for child in root.children:
@@ -142,7 +148,7 @@ def calculate_move( top, turn = 1 ):
         result = explore_children( result )
         search_results.append( [ piece, result ] )
     for result in search_results:
-        if result[ 1 ][ 0 ] > 11:
+        if result[ 1 ][ 0 ] > 25:
             search_results.remove( result )
     from_cord = [ ]
     to_cord = [ ]
@@ -152,6 +158,22 @@ def calculate_move( top, turn = 1 ):
             from_cord = result[ 0 ]
             to_cord = result[ 1 ][ 2 ]
             best_magnitude = result[ 1 ][ 1 ]
+
+    magnitudes = [ ]
+    for result in search_results:
+        if result[ 1 ][ 0 ] < 10:
+            magnitudes.append( result[ 1 ][ 0 ] )
+
+    magnitudes.sort()
+
+    difference = magnitudes[ -1 ] - magnitudes[ -2 ]
+
+    if difference > 0.5 or difference == 0:
+        for result in search_results:
+            if magnitudes[ -1 ] == result[ 1 ][ 0 ]:
+                from_cord = result[ 0 ]
+                to_cord = result[ 1 ][ 2 ]
+                best_magnitude = result[ 1 ][ 1 ]
 
     from_cord.reverse()
     to_cord.reverse()
@@ -171,10 +193,17 @@ def game():
             board.table = calculate_move( board.table, 1 )
             turn = 2
         else:
-            x = int( input( 'Piece from (X-Cord): ' ) )
-            y = int( input( 'Piece from (Y-Cord): ' ) )
-            new_x = int( input( 'Piece to (X-Cord): ' ) )
-            new_y = int( input( 'Piece to (Y-Cord): ' ) )
+            try:
+                x = int( input( 'Piece from (X-Cord): ' ) )
+                y = int( input( 'Piece from (Y-Cord): ' ) )
+                new_x = int( input( 'Piece to (X-Cord): ' ) )
+                new_y = int( input( 'Piece to (Y-Cord): ' ) )
+            except:
+                x = 0
+                y = 0
+                new_x = 0
+                new_y = 0
+
             x, y = y, x
             new_x, new_y = new_y, new_x
             board.table = make_move( board.table, [ x, y ], [ new_x, new_y ], 2 )
@@ -214,7 +243,7 @@ def is_current_player_piece( top, x, y, player ):
 def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True, depth = 0, parent = None ) -> list:
     if depth == MAX_DEPTH:
         return None
-    root = Node( x, y, player = player, parent = parent )
+    root = NodeClass( x, y, player = player, parent = parent )
     around_cords = [
         [ x - 1, y + 1 ], [ x, y + 1 ], [ x + 1, y + 1 ],
         [ x - 1, y ], [ x + 1, y ],
@@ -227,7 +256,7 @@ def find_possible_moves( top: list, x: int, y: int, player: int, is_root = True,
             x_cord, y_cord = cord
             exists = has_piece( top, x_cord, y_cord )
             if not exists and is_root:
-                root.add_node( Node( x_cord, y_cord, player ) )
+                root.add_node( NodeClass( x_cord, y_cord, player ) )
             elif exists:
                 new_x = (2 * x_cord) - x
                 new_y = (2 * y_cord) - y
