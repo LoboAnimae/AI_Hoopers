@@ -63,7 +63,7 @@ class Table:
         while i >= 0:
             print( '%d || ' % i, end = '' )
             for j in self.table[ i ]:
-                print( '%d ' % j, end = '' )
+                print( '%s ' % j, end = '' )
             print()
             i -= 1
         # for index, i in enumerate( self.table ):
@@ -216,7 +216,7 @@ def make_move( top, old_cord, new_cord, player ):
     old_x, old_y = old_cord
     new_x, new_y = new_cord
 
-    top[ old_x ][ old_y ] = 0
+    top[ old_x ][ old_y ] = '.'
     top[ new_x ][ new_y ] = player
     return top
 
@@ -231,7 +231,7 @@ def return_possible_moves_array( node ):
 
 
 def has_piece( top, x, y ):
-    if top[ x ][ y ] == 0:
+    if top[ x ][ y ] == '.':
         return False
     return True
 
@@ -277,16 +277,16 @@ def fill_rows():
     top = Table()
     # i = from_column - 1
     top.table = [
-        [ 0, 0, 0, 0, 0, 2, 2, 2, 2, 2 ],
-        [ 0, 0, 0, 0, 0, 0, 2, 2, 2, 2 ],
-        [ 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 ],
-        [ 0, 0, 0, 0, 0, 0, 0, 0, 2, 2 ],
-        [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 ],
-        [ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
-        [ 1, 1, 0, 0, 0, 0, 0, 0, 0, 0 ],
-        [ 1, 1, 1, 0, 0, 0, 0, 0, 0, 0 ],
-        [ 1, 1, 1, 1, 0, 0, 0, 0, 0, 0 ],
-        [ 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 ]
+        [ '.', '.', '.', '.', '.', 2, 2, 2, 2, 2 ],
+        [ '.', '.', '.', '.', '.', '.', 2, 2, 2, 2 ],
+        [ '.', '.', '.', '.', '.', '.', '.', 2, 2, 2 ],
+        [ '.', '.', '.', '.', '.', '.', '.', '.', 2, 2 ],
+        [ '.', '.', '.', '.', '.', '.', '.', '.', '.', 2 ],
+        [ 1, '.', '.', '.', '.', '.', '.', '.', '.', '.' ],
+        [ 1, 1, '.', '.', '.', '.', '.', '.', '.', '.' ],
+        [ 1, 1, 1, '.', '.', '.', '.', '.', '.', '.' ],
+        [ 1, 1, 1, 1, '.', '.', '.', '.', '.', '.' ],
+        [ 1, 1, 1, 1, 1, '.', '.', '.', '.', '.' ]
     ]
     # while i < to_column:
     #     top.table[ from_row - 1 ][ i ] = cell_type
